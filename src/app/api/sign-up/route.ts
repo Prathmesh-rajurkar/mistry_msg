@@ -24,30 +24,40 @@ export async function POST(request: Request) {
     const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     if (existingUserVerifiedByEmail) {
-      return Response.json(
-        {
-          success: false,
-          message: "Email already exists",
-        },
-        { status: 400 }
-      );
-    }else {
-        const hashedPassword = await bcrypt.hash(password,10);
-        const expiryDate = new Date();
-        expiryDate.setHours(expiryDate.getHours() + 1);
+      if (existingUserVerifiedByEmail.isVerified) {
+        return Response.json(
+          {
+            success: false,
+            message: "Email already exists",
+          },
+          { status: 400 }
+        );
+      } else {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        existingUserVerifiedByEmail.password = hashedPassword;
+        existingUserVerifiedByEmail.verifyCode = verifyCode;
+        existingUserVerifiedByEmail.verifyCodeExpire = new Date(
+          Date.now() + 3600000
+        );
+        await existingUserVerifiedByEmail.save();
+      }
+    } else {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const expiryDate = new Date();
+      expiryDate.setHours(expiryDate.getHours() + 1);
 
-        const newUser = new UserModel({
-            username,
-            password: hashedPassword,
-            email,
-            isVerified: false,
-            verifyCode,
-            verifyCodeExpired: expiryDate,
-            isAcceptingMessages: true,
-            messages: []
-        })
+      const newUser = new UserModel({
+        username,
+        password: hashedPassword,
+        email,
+        isVerified: false,
+        verifyCode,
+        verifyCodeExpired: expiryDate,
+        isAcceptingMessages: true,
+        messages: [],
+      });
 
-        await newUser.save();
+      await newUser.save();
     }
 
     const emailResponse = await sendVerificationEmail(
